@@ -1,4 +1,6 @@
 #Pectorbis von Timofej D. Kazakov (Github: timdika)
+#Hauptquelle: "Neural Networks From Scratch In Python"
+#Datensatz: "NIH Chest X-ray Dataset"
 
 import os
 import numpy as np
