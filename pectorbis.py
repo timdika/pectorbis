@@ -25,7 +25,7 @@ class Layer_Dense:
         self.inputs = inputs
         self.output = np.dot(inputs, self.gwicht) + self.biases
 
-    def backward(self, dvalues): #Zruggpropagation (Kap 9 bis Siite 214)
+    def backward(self, dvalues): 
         self.dgwicht = np.dot(self.inputs.T, dvalues)
         self.dbiases = np.sum(dvalues, axis=0, keepdims=True)
 
@@ -38,7 +38,7 @@ class Layer_Dense:
         # L2 on weights
         if self.gwicht_regularizierer_l2 > 0:
             self.dgwicht += 2 * self.gwicht_regularizierer_l2 * \
-            self.gwicht
+                                self.gwicht
         # L1 on biases
         if self.bias_regularizierer_l1 > 0:
             dL1 = np.ones_like(self.biases)
@@ -47,7 +47,7 @@ class Layer_Dense:
         # L2 on biases
         if self.bias_regularizierer_l2 > 0:
             self.dbiases += 2 * self.bias_regularizierer_l2 * \
-            self.biases
+                                self.biases
 
         self.dinputs = np.dot(dvalues, self.gwicht.T)
 
@@ -92,7 +92,7 @@ class Aktivierung_Softmax:
         self.dinputs = np.empty_like(dvalues) #Wir machen einen uninitalisierten Array
 
         #Enumerate outputs and gradients:
-        for index, (single_output, single_dvalues) in enumerate(zip(self.output, dvalues)): #???
+        for index, (single_output, single_dvalues) in enumerate(zip(self.output, dvalues)):
             
             single_output = single_output.reshape(-1, 1) #Flatten out array
             jacobian_matrix = np.diagflat(single_output) - np.dot(single_output, single_output.T)
@@ -391,69 +391,69 @@ class Model:
                     batch_X = X[schritt*batch_size:(schritt+1)*batch_size]
                     batch_y = y[schritt*batch_size:(schritt+1)*batch_size]
 
-            output = self.forward(batch_X, training=True)
+                output = self.forward(batch_X, training=True)
 
-            data_loss, regularization_loss = self.loss.kalkulieren(output, batch_y, include_reg=True)
-            loss = data_loss + regularization_loss
-
-            vorhersagen = self.output_layer_activation.vorhersagen(output)
-            genauigkeit = self.genauigkeit.kalkulieren(vorhersagen, batch_y)
-        
-            self.backward(output, batch_y)
-
-            self.optimizer.pre_update_params()
-            for layer in self.trainable_layers:
-                self.optimizer.update_params(layer)
-            self.optimizer.post_update_params()
-
-            if not schritt % print_every or schritt == train_schritte - 1:
-                print(f'schritt: {schritt},' +
-                      f'genau: {genauigkeit:.3f},' +
-                    f'loss: {loss:.3f}, (' +
-                    f'data_loss: {data_loss:.3f}, ' +
-                    f'reg_loss: {regularization_loss:.3f}), ' +
-                    f'lr: {self.optimizer.momentane_lern_rate}')
-
-        epoch_data_loss, epoch_regularization_loss = self.loss.accumulated_kalkulieren(include_reg=True)
-        epoch_loss = epoch_data_loss + epoch_regularization_loss
-        epoch_genauigkeit = self.genauigkeit.accumulated_kalkulieren()
-        print(f'training, ' +
-                f'genau: {epoch_genauigkeit:.3f}, '+
-                f'loss: {epoch_loss:.3f}, (' +
-                f'data_loss: {epoch_data_loss:.3f}, ' +
-                f'reg_loss: {epoch_regularization_loss:.3f}) '+
-                f'lr: {self.optimizer.momentane_lern_rate}')
-    
-        if validation_data is not None:
-
-            self.loss.neu_pass()
-            self.genauigkeit.neu_pass()
-
-            for schritt in range(validierungs_schritte):
-
-                if batch_size is None:
-                    batch_X = X_val
-                    batch_y = y_val
-
-                else:
-                    batch_X = X_val[schritt*batch_size:(schritt+1)*batch_size]
-                    batch_y = y_val[schritt*batch_size:(schritt+1)*batch_size]
-
-            
-                output = self.forward(batch_X, training=False)
-            
-                self.loss.kalkulieren(output, batch_y)
+                data_loss, regularization_loss = self.loss.kalkulieren(output, batch_y, include_reg=True)
+                loss = data_loss + regularization_loss
 
                 vorhersagen = self.output_layer_activation.vorhersagen(output)
+                genauigkeit = self.genauigkeit.kalkulieren(vorhersagen, batch_y)
+        
+                self.backward(output, batch_y)
 
-                self.genauigkeit.kalkulieren(vorhersagen, batch_y)
+                self.optimizer.pre_update_params()
+                for layer in self.trainable_layers:
+                    self.optimizer.update_params(layer)
+                self.optimizer.post_update_params()
 
-            validation_loss = self.loss.accumulated_kalkulieren()
-            validation_genauigkeit = self.genauigkeit.accumulated_kalkulieren()
+                if not schritt % print_every or schritt == train_schritte - 1:
+                    print(f'schritt: {schritt},' +
+                        f'genau: {genauigkeit:.3f},' +
+                        f'loss: {loss:.3f}, (' +
+                        f'data_loss: {data_loss:.3f}, ' +
+                        f'reg_loss: {regularization_loss:.3f}), ' +
+                        f'lr: {self.optimizer.momentane_lern_rate}')
 
-            print(f'validation, ' + 
-                f'genau: {validation_genauigkeit:.3f}, '+
-                f'loss: {validation_loss:.3f}')
+            epoch_data_loss, epoch_regularization_loss = self.loss.accumulated_kalkulieren(include_reg=True)
+            epoch_loss = epoch_data_loss + epoch_regularization_loss
+            epoch_genauigkeit = self.genauigkeit.accumulated_kalkulieren()
+            print(f'training, ' +
+                    f'genau: {epoch_genauigkeit:.3f}, '+
+                    f'loss: {epoch_loss:.3f}, (' +
+                    f'data_loss: {epoch_data_loss:.3f}, ' +
+                    f'reg_loss: {epoch_regularization_loss:.3f}) '+
+                    f'lr: {self.optimizer.momentane_lern_rate}')
+        
+            if validation_data is not None:
+
+                self.loss.neu_pass()
+                self.genauigkeit.neu_pass()
+
+                for schritt in range(validierungs_schritte):
+
+                    if batch_size is None:
+                        batch_X = X_val
+                        batch_y = y_val
+
+                    else:
+                        batch_X = X_val[schritt*batch_size:(schritt+1)*batch_size]
+                        batch_y = y_val[schritt*batch_size:(schritt+1)*batch_size]
+
+                
+                    output = self.forward(batch_X, training=False)
+                
+                    self.loss.kalkulieren(output, batch_y)
+
+                    vorhersagen = self.output_layer_activation.vorhersagen(output)
+
+                    self.genauigkeit.kalkulieren(vorhersagen, batch_y)
+
+                validation_loss = self.loss.accumulated_kalkulieren()
+                validation_genauigkeit = self.genauigkeit.accumulated_kalkulieren()
+
+                print(f'validation, ' + 
+                    f'genau: {validation_genauigkeit:.3f}, '+
+                    f'loss: {validation_loss:.3f}')
 
     def forward(self, X, training):
 
@@ -498,7 +498,7 @@ def Datensatz_laden(datensatz, path):
 
     for label in labels:
         for file in os.listdir(os.path.join(path, datensatz, label)):
-            image = cv2.imread(os.path.join(path, datensatz, label, file), cv2.IMREAD_UNCHANGED)
+            image = cv2.imread(os.path.join(path, datensatz, label, file), cv2.IMREAD_GRAYSCALE)
 
             X.append(image)
             y.append(label)
@@ -536,18 +536,20 @@ X_test = (X_test.reshape(X_test.shape[0], -1).astype(np.float32) - 127.5) / 127.
 model = Model()
 
 #Add layers:
-model.add(Layer_Dense(X.shape[1], 128))
+model.add(Layer_Dense(X.shape[1], 5))
 model.add(Aktivierung_ReLU())
-model.add(Layer_Dense(128, 128))
+model.add(Layer_Dense(5, 5))
 model.add(Aktivierung_ReLU())
-model.add(Layer_Dense(128, 2))
+model.add(Layer_Dense(5, 2))
 model.add(Aktivierung_Softmax())
 
-#IM BUECH ISCH loss=Loss_MeanSquaredError()
+
 model.set(
-    loss=Verlust_CatCrossEnt(), optimizer=HerrAdam(decay=5e-5), #lernrate vor decay 
+    loss=Verlust_CatCrossEnt(), 
+    optimizer=HerrAdam(decay=5e-5), #lernrate vor decay 
     genauigkeit=Genauigkeit_Categorial())
 
 model.finalize()
 
-model.train(X, y, validation_data=(X_test, y_test), epochen=5, batch_size=128, print_every=100)
+model.train(X, y, validation_data=(X_test, y_test), 
+            epochen=10, batch_size=5, print_every=100)
