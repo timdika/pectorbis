@@ -265,7 +265,14 @@ class Genauigkeit:
 
         vergleiche = self.vergleichen(vorhersagen, y)
 
+        #Debug?
+        print(vergleiche)
+        print(vorhersagen)
+        print(y)
+
         genauigkeit = np.mean(vergleiche)
+
+        print(genauigkeit)
 
         self.accumulated_sum += np.sum(vergleiche)
         self.accumulated_count += len(vergleiche)
@@ -293,7 +300,7 @@ class Genauigkeit_Categorial(Genauigkeit):
     def vergleichen(self, vorhersagen, y):
         if not self.binary and len(y.shape) == 2:
             y = np.argmax(y, axis=1)
-            return vorhersagen == y
+        return vorhersagen == y
 
 
 #----------------------------------------------------------
