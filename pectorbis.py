@@ -6,6 +6,10 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
+import pickle
+import copy
+
+from numpy.lib.function_base import copy
 
 
 #Kreation eines Layers:
@@ -52,6 +56,13 @@ class Layer_Dense:
                                 self.biases
 
         self.dinputs = np.dot(dvalues, self.gwicht.T)
+
+    def get_param(self):
+        return self.gwicht, self.biases
+
+    def set_param(self, gwicht, biases):
+        self.gwicht = gwicht
+        self.biases = biases
 
 
 #Kreation der Input-Klasse:
@@ -266,13 +277,13 @@ class Genauigkeit:
         vergleiche = self.vergleichen(vorhersagen, y)
 
         #Debug?
-        print(vergleiche)
-        print(vorhersagen)
-        print(y)
+        #print(vergleiche)
+        #print(vorhersagen)
+        #print(y)
 
         genauigkeit = np.mean(vergleiche)
 
-        print(genauigkeit)
+        #print(genauigkeit)
 
         self.accumulated_sum += np.sum(vergleiche)
         self.accumulated_count += len(vergleiche)
@@ -320,10 +331,14 @@ class Model:
     def add(self, layer):
         self.layers.append(layer)
 
-    def set(self, *, loss, optimizer, genauigkeit): # Set loss and optimizer
-        self.loss = loss
-        self.optimizer = optimizer
-        self.genauigkeit = genauigkeit
+    def set(self, *, loss=None, optimizer=None, genauigkeit=None): # Set loss and optimizer
+        if loss is not None:
+            self.loss = loss
+        if optimizer is not None:
+            self.optimizer = optimizer
+        if genauigkeit is not None:
+            self.genauigkeit = genauigkeit
+        
     
     def finalize(self):
         #Create and set the inputs layer:
@@ -354,8 +369,8 @@ class Model:
             #If layer contains an attribute called "gwicht", its a trainable layer - add to list
             if hasattr(self.layers[i], 'gwicht'):
                 self.trainable_layers.append(self.layers[i])
-
-        self.loss.remember_trainable_layers(self.trainable_layers)
+        if self.loss is not None:
+            self.loss.remember_trainable_layers(self.trainable_layers)
 
 
         #if isinstance(self.layers[-1], Aktivierung_Softmax) and isinstance(self.loss, Verlust_CatCrossEnt):
@@ -435,34 +450,7 @@ class Model:
         
             if validation_data is not None:
 
-                self.loss.neu_pass()
-                self.genauigkeit.neu_pass()
-
-                for schritt in range(validierungs_schritte):
-
-                    if batch_size is None:
-                        batch_X = X_val
-                        batch_y = y_val
-
-                    else:
-                        batch_X = X_val[schritt*batch_size:(schritt+1)*batch_size]
-                        batch_y = y_val[schritt*batch_size:(schritt+1)*batch_size]
-
-                
-                    output = self.forward(batch_X, training=False)
-                
-                    self.loss.kalkulieren(output, batch_y)
-
-                    vorhersagen = self.output_layer_activation.vorhersagen(output)
-
-                    self.genauigkeit.kalkulieren(vorhersagen, batch_y)
-
-                validation_loss = self.loss.accumulated_kalkulieren()
-                validation_genauigkeit = self.genauigkeit.accumulated_kalkulieren()
-
-                print(f'validation, ' + 
-                    f'genau: {validation_genauigkeit:.3f}, '+
-                    f'loss: {validation_loss:.3f}')
+                self.eval(*validation_data, batch_size=batch_size)
 
     def forward(self, X, training):
 
@@ -489,6 +477,101 @@ class Model:
 
         for layer in reversed(self.layers):
             layer.backward(layer.next.dinputs)
+
+    def eval(self, X_val, y_val, *, batch_size=None):
+        validierungs_schritte = 1
+
+        if batch_size is not None:
+            validierungs_schritte = len(X_val) // batch_size
+            if validierungs_schritte * batch_size < len(X_val):
+                validierungs_schritte += 1
+        
+        self.loss.neu_pass()
+        self.genauigkeit.neu_pass()
+
+        for schritt in range(validierungs_schritte):
+
+            if batch_size is None:
+                batch_X = X_val
+                batch_y = y_val
+
+            else:
+                batch_X = X_val[schritt*batch_size:(schritt+1)*batch_size]
+                batch_y = y_val[schritt*batch_size:(schritt+1)*batch_size]
+
+                
+            output = self.forward(batch_X, training=False)
+                
+            self.loss.kalkulieren(output, batch_y)
+
+            vorhersagen = self.output_layer_activation.vorhersagen(output)
+
+            self.genauigkeit.kalkulieren(vorhersagen, batch_y)
+
+        validation_loss = self.loss.accumulated_kalkulieren()
+        validation_genauigkeit = self.genauigkeit.accumulated_kalkulieren()
+
+        print(f'validation, ' + 
+            f'genau: {validation_genauigkeit:.3f}, '+
+            f'loss: {validation_loss:.3f}')
+
+    def get_param(self):
+        parameter = []
+
+        for layer in self.trainable_layers:
+            parameter.append(layer.get_param())
+        return parameter
+
+    def set_param(self, parameter):
+        for parameter_set, layer in zip(parameter, self.trainable_layers):
+            layer.set_param(*parameter_set)
+
+    def save_param(self, path):
+        with open(path, 'wb') as f:
+            pickle.dump(self.get_param(), f)
+            #Parameter von trainiertem Model sichern mit: model.save_param('ZweiFallDatensatz.parms')
+
+    def load_param(self, path):
+        with open(path, 'rb') as f:
+            self.set_param(pickle.load(f))
+    
+    def save(self, path):
+        model = copy.deepcopy(self)
+
+        model.loss.neu_pass()
+        model.genauigkeit.neu_pass()
+        model.input_layer.__dict__.pop('output', None)
+        model.loss.__dict__.pop('dinputs', None)
+
+        for layer in model.layers:
+            for ding in ['inputs', 'output', 'dinputs', 'dgwicht', 'dbiases']:
+                layer.__dict__.pop(ding, None)
+
+        with open(path, 'wb') as f:
+            pickle.dump(model, f)
+        #Das Model speichern wenn auch immer mit: model.save('pectorbis.model')
+
+    def voraussagen(self, X, *, batch_size=None):
+        voraussagen_schritte = 1
+
+        if batch_size is not None:
+            voraussagen_schritte = len(X) // batch_size
+            if voraussagen_schritte * batch_size < len(X):
+                voraussagen_schritte += 1
+        output = []
+
+        for schritt in range(voraussagen_schritte):
+            if batch_size is None:
+                batch_X = X
+            else:
+                batch_X = X[schritt*batch_size:(schritt+1)*batch_size]
+            
+            batch_output = self.forward(batch_X, training=False)
+
+            output.append(batch_output)
+
+        return np.vstack(output)
+
 
 
 #----------------------------------------------------------
@@ -545,11 +628,11 @@ X_test = (X_test.reshape(X_test.shape[0], -1).astype(np.float32) - 127.5) / 127.
 model = Model()
 
 #Add layers:
-model.add(Layer_Dense(X.shape[1], 5))
+model.add(Layer_Dense(X.shape[1], 2))
 model.add(Aktivierung_ReLU())
-model.add(Layer_Dense(5, 5))
+model.add(Layer_Dense(2, 2))
 model.add(Aktivierung_ReLU())
-model.add(Layer_Dense(5, 2))
+model.add(Layer_Dense(2, 2))
 model.add(Aktivierung_Softmax())
 
 
@@ -561,4 +644,26 @@ model.set(
 model.finalize()
 
 model.train(X, y, validation_data=(X_test, y_test), 
-            epochen=10, batch_size=5, print_every=100)
+            epochen=10, batch_size=2, print_every=100)
+#model.eval(X_test, y_test)
+#model.eval(X, y) #Final eval of loss and acc
+parameter = model.get_param()
+
+#NEUES MODEL:
+model = Model()
+
+model.add(Layer_Dense(X.shape[1], 2))
+model.add(Aktivierung_ReLU())
+model.add(Layer_Dense(2, 2))
+model.add(Aktivierung_ReLU())
+model.add(Layer_Dense(2, 2))
+model.add(Aktivierung_Softmax())
+
+model.set(loss=Verlust_CatCrossEnt(), genauigkeit=Genauigkeit_Categorial())
+
+model.finalize()
+
+model.set_param(parameter)
+#model.load_param('pectorbis.parms')? Seite 611
+
+model.eval(X_test, y_test)
